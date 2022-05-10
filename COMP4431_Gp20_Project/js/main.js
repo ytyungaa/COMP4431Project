@@ -7,6 +7,8 @@ var currentEffects = ["no-pp", "no-pp", "no-pp", "no-pp", "no-pp"]; // Currently
 var currentZoomLevel = "all"; // Currently selected zoom mode
 var zoomStartFrom = 0.0; // Zoom start from (in seconds)
 
+var currentPass = 0;
+
 
 // Event handler for the 'change' event of the zoom <select>
 function changeZoomLevel(e) {
@@ -109,6 +111,8 @@ function showTab(e) {
         // Find the drop down menu item of this tab (i.e. the waveform) that is currently selected
         target = target.find("ul li a[href='#" + currentWaveformType + "']");
     }
+
+    currentPass = ppStage;
 
     // Show the tab and make the tab active
     target.trigger('click');
@@ -292,6 +296,7 @@ $(document).ready(function () {
     // After setting up the event handler, we also take the first element in the set
     // and programmatically trigger a 'change' event.
     $("#waveform-duration, #triangle-additive-basis, #karplus-base, #additiveSynthExample, #ahdsr-attack-form, #ahdsr-decay-form, #ahdsr-release-form, #attack-exponent, #decay-exponent, #release-exponent, input").not("[id^=import], #zoomStartFrom").on("change", updateWaveformDisplay).first().change();
+
 
     $("#waveform-duration").on("change", function () {
         // Add two channels to it with label "Left Channel" and "Right Channel"

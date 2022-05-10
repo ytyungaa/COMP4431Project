@@ -187,8 +187,209 @@ Postprocessor = {
                 var attackExponent = parseFloat($("#attack-exponent").data("p" + pass));
                 var decayExponent = parseFloat($("#decay-exponent").data("p" + pass));
                 var releaseExponent = parseFloat($("#release-exponent").data("p" + pass));
-                console.log(attackExponent);
+                console.log("attackExponent : " + attackExponent);
 
+
+                //handle the draggable chart
+
+                //generate the data points for chart
+                var attackPeriod = parseFloat($("#ahdsr-attack-duration").data("p" + currentPass));
+                var holdPeriod = parseFloat($("#ahdsr-hold-duration").data("p" + currentPass));
+                var decayPeriod = parseFloat($("#ahdsr-decay-duration").data("p" + currentPass));
+                var releasePeriod = parseFloat($("#ahdsr-release-duration").data("p" + currentPass));
+                var sustainPeriod = duration - attackPeriod - holdPeriod - decayPeriod - releasePeriod;
+
+                var startOfDecay = attackPeriod + holdPeriod;
+                var startOfSustain = startOfDecay + decayPeriod;
+                var startOfRelease = startOfSustain + sustainPeriod;
+
+                var data = [{ x: 0, y: 0, data: "start of attack", draggable: false }];
+
+                //attack section
+                for (var i = 0.1; i < 1; i = parseFloat((i + 0.1).toFixed(1))) {
+                    var yv = 0;
+                    if (attackForm == "linear") {
+                        yv = (lerp(0, attackPeriod, i) / attackPeriod);
+                    }
+                    else {
+                        yv = Math.pow((lerp(0, attackPeriod, i) / attackPeriod), attackExponent);
+                    }
+                    let t = { x: lerp(0, attackPeriod, i), y: yv, draggable: false }
+                    data.push(t);
+
+                }
+                data.push({ x: attackPeriod, y: 1, data: "end of attack", draggable: true });
+
+
+                data.push({ x: (attackPeriod + holdPeriod), y: 1, data: "end of hold", draggable: true });
+
+
+                //decay section
+                for (var i = 0.1; i < 1; i = i = parseFloat((i + 0.1).toFixed(1))) {
+                    var yv = 0;
+                    if (decayForm == "linear") {
+                        yv = 1 - (1 - sustainLevel) * (lerp(startOfDecay, startOfSustain, i) - startOfDecay) / decayPeriod;
+                    }
+                    else {
+                        yv = 1 - (1 - sustainLevel) * Math.pow(((lerp(startOfDecay, startOfSustain, i) - startOfDecay) / decayPeriod), decayExponent) * 1;
+                    }
+                    let t = { x: (lerp(startOfDecay, startOfSustain, i)), y: yv, draggable: false }
+                    data.push(t);
+
+                }
+                data.push({ x: (startOfDecay + decayPeriod), y: sustainLevel, data: "start of sustain", draggable: true });
+
+
+                data.push({ x: (startOfSustain + sustainPeriod), y: sustainLevel, data: "end of sustain", draggable: true });
+
+
+                //release level
+                for (var i = 0.1; i < 1; i = i = parseFloat((i + 0.1).toFixed(1))) {
+                    var yv = 0;
+                    if (releaseForm == "linear") {
+                        yv = sustainLevel - sustainLevel * (lerp(startOfRelease, parseInt(duration), i) - startOfRelease) / releasePeriod;
+                    }
+                    else {
+                        yv = sustainLevel - sustainLevel * Math.pow(((lerp(startOfRelease, parseInt(duration), i) - startOfRelease) / releasePeriod), releaseExponent);
+                    }
+
+                    let t = { x: lerp(startOfRelease, parseInt(duration), i), y: yv, draggable: false };
+
+                    data.push(t)
+                }
+
+                data.push({ x: parseInt(duration), y: 0, data: "end of release", draggable: false });
+
+
+                var options = {
+                    type: 'line',
+                    data: {
+
+                        datasets: [{
+                            label: "Amplitude",
+                            fill: true,
+                            data: data,
+                            pointHitRadius: 20,
+                            borderColor: "rgb(255,0,0)"
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                type: "linear",
+                                max: 1.1,
+                                min: 0
+                            },
+                            x: {
+                                type: "linear",
+                                max: parseInt(duration),
+                                min: 0,
+                                step: 1,
+                                stepValue: 1
+                            }
+                        },
+                        responsive: false,
+
+                        plugins: {
+                            dragData: {
+                                round: 2,
+                                dragX: true,
+                                showTooltip: true,
+
+                                onDragStart: function (e, datasetIndex, index, value) {
+                                    console.log(value);
+                                    if (!value.draggable) return false;
+                                },
+
+                                onDrag: function (e, datasetIndex, index, value) {
+                                    e.target.style.cursor = 'grabbing';
+
+                                    if (value.y > 1) {
+                                        value.y = 1;
+                                        return false;
+                                    }
+
+                                    if (value.y < 1 && (value.data == "end of attack" || value.data == "end of hold")) {
+                                        value.y = 1;
+                                        return false;
+                                    }
+
+
+                                    if (value.data == "start of sustain" || value.data == "end of sustain") {
+                                        if (value.data == "start of sustain")
+                                            data[index + 1].y = value.y;
+                                        if (value.data == "end of sustain")
+                                            data[index - 1].y = value.y;
+                                    }
+
+
+                                    window.myChart.update();
+
+                                },
+                                onDragEnd: function (e, datasetIndex, index, value) {
+                                    e.target.style.cursor = 'default';
+                                    // console.log(datasetIndex, index, value)
+
+                                    if (value.data == "end of attack") {
+
+                                        $("#ahdsr-attack-duration").attr(("data-p" + pass), (value.x));
+
+                                        $("#ahdsr-attack-duration").val(value.x);
+                                        $("#ahdsr-attack-duration").change();
+                                    }
+
+                                    if (value.data == "end of hold") {
+
+                                        $("#ahdsr-hold-duration").attr(("data-p" + pass), parseFloat((value.x - attackPeriod).toFixed(2)));
+
+                                        $("#ahdsr-hold-duration").val(parseFloat((value.x - attackPeriod).toFixed(2)));
+                                        $("#ahdsr-hold-duration").change();
+                                    }
+
+                                    if (value.data == "start of sustain") {
+
+                                        $("#ahdsr-decay-duration").attr(("data-p" + pass), parseFloat((value.x - startOfDecay).toFixed(2)));
+
+                                        $("#ahdsr-decay-duration").val(parseFloat((value.x - startOfDecay).toFixed(2)));
+
+
+                                        $("#ahdsr-sustain-level").attr(("data-p" + pass), parseFloat((value.y).toFixed(3)) * 100);
+                                        $("#ahdsr-sustain-level").val(parseFloat((value.y).toFixed(3)) * 100)
+
+                                        $("#ahdsr-decay-duration").change();
+                                        $("#ahdsr-sustain-level").change();
+                                    }
+
+                                    if (value.data == "end of sustain") {
+
+                                        $("#ahdsr-release-duration").attr(("data-p" + pass), parseFloat((duration - value.x).toFixed(2)));
+
+                                        $("#ahdsr-release-duration").val(parseFloat((duration - value.x).toFixed(2)));
+
+                                        $("#ahdsr-sustain-level").attr(("data-p" + pass), parseFloat((value.y).toFixed(3)) * 100);
+                                        $("#ahdsr-sustain-level").val(parseFloat((value.y).toFixed(3)) * 100)
+
+                                        $("#ahdsr-release-duration").change();
+                                        $("#ahdsr-sustain-level").change();
+                                    }
+
+                                },
+                            }
+                        }
+                    }
+                }
+
+                if (window.myChart instanceof Chart) window.myChart.destroy();
+
+                $("#canvas").remove();
+                $("#ahdsr").append('<canvas id="canvas" height="400px" width="800px"></canvas>');
+
+                var ctx = document.getElementById("canvas").getContext('2d');
+                var chart = new Chart(ctx, options);
+                window.myChart = chart;
+
+
+                //modify the sample value for each channels
 
                 console.log(attackForm)
                 //linear exponential
@@ -238,10 +439,10 @@ Postprocessor = {
                                 var multiplier = sustainLevel * (totalSamples - 1 - i) / releaseDuration;
                             }
                             else {
-                                var amt = Math.pow(((totalSamples - 1 - i) / releaseDuration), releaseExponent) ;
-                                var multiplier = lerp(0, sustainLevel, amt);
+                                var amt = Math.pow((((i - (totalSamples - releaseDuration))) / releaseDuration), releaseExponent);
+                                var multiplier = lerp(sustainLevel, 0, amt);
                             }
-                            
+
                             audioSequence.data[i] *= multiplier;
                         }
                     }
